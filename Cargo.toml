@@ -15,3 +15,6 @@ ansi_term = "^0.10.2"
 clap = "^2.26.2"
 error-chain = "^0.11.0"
 ut181a = "^0.1.0"
+
+[badges]
+travis-ci = { repository = "antage/ut181a-cli" }
