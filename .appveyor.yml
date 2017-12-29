@@ -7,7 +7,6 @@ install:
   - rustc --version
   - cargo --version
   - rustup --version
-  - rustup target list
 cache:
   - '%USERPROFILE%\.rustup'
   - '%USERPROFILE%\.cargo'
