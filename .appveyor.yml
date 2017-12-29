@@ -1,0 +1,31 @@
+version: 0.2.0.{build}
+environment:
+  matrix:
+    # 64 bit
+    - TARGET: x86_64-pc-windows-msvc
+      BITS: 64
+    - TARGET: x86_64-pc-windows-gnu
+      BITS: 64
+      MINGW: yes
+    # 32 bit
+    - TARGET: i686-pc-windows-msvc
+      BITS: 32
+    - TARGET: i686-pc-windows-gnu
+      BITS: 32
+      MINGW: yes
+install:
+  - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
+  - rustup-init -yv --default-toolchain stable --default-host %TARGET%
+  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - if defined MINGW set PATH=C:\msys64\mingw%BITS%\bin;%PATH%
+  - rustc --version
+  - cargo --version
+  - rustup --version
+cache:
+  - '%USERPROFILE%\.rustup'
+  - '%USERPROFILE%\.cargo'
+  - target
+build:
+  - cargo build --verbose --release --features=build --target %TARGET%
+test_script: off
+deploy: off
