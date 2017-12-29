@@ -25,3 +25,13 @@ artifacts:
     name: MSVC32
   - path: target/ut181a-cli_64bit.zip
     name: MSVC64
+deploy:
+  - provider: GitHub
+    tag: $(APPVEYOR_REPO_TAG_NAME)
+    auth_token:
+      secure: uu2RXA1CcjTjKs8qz94eVtPJigzLyCeoogUu5Dzu42E/421V8TUpm4dzhI9pkik3
+    artifact: MSVC32, MSVC64
+    draft: true
+    force_update: true
+    on:
+      APPVEYOR_REPO_TAG: true
