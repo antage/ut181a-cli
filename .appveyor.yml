@@ -25,7 +25,7 @@ cache:
   - '%USERPROFILE%\.rustup'
   - '%USERPROFILE%\.cargo'
   - target
-build:
+build_script:
   - cargo build --verbose --release --features=build --target %TARGET%
 test_script: off
 deploy: off
