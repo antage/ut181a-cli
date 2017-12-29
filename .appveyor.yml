@@ -1,31 +1,24 @@
 version: 0.2.0.{build}
-environment:
-  matrix:
-    # 64 bit
-    - TARGET: x86_64-pc-windows-msvc
-      BITS: 64
-    - TARGET: x86_64-pc-windows-gnu
-      BITS: 64
-      MINGW: yes
-    # 32 bit
-    - TARGET: i686-pc-windows-msvc
-      BITS: 32
-    - TARGET: i686-pc-windows-gnu
-      BITS: 32
-      MINGW: yes
 install:
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init -yv --default-toolchain stable --default-host %TARGET%
+  - rustup-init -yv --default-toolchain stable --default-host x86_64-pc-windows-msvc
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
-  - if defined MINGW set PATH=C:\msys64\mingw%BITS%\bin;%PATH%
+  - rustup target add i686-pc-windows-msvc
   - rustc --version
   - cargo --version
   - rustup --version
+  - rustup target list
 cache:
   - '%USERPROFILE%\.rustup'
   - '%USERPROFILE%\.cargo'
   - target
 build_script:
-  - cargo build --verbose --release --features=build --target %TARGET%
+  - cargo build --verbose --release --features=build --target x86_64-pc-windows-msvc
+  - cargo build --verbose --release --features=build --target i686-pc-windows-msvc
 test: off
 deploy: off
+artifacts:
+  - path: target/i686-pc-windows-msvc/release/ut181a-cli.exe
+    name: MSVC32
+  - path: target/x86_64-pc-windows-msvc/release/ut181a-cli.exe
+    name: MSVC64
