@@ -1,5 +1,7 @@
 # ut181a-cli
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Build Status](https://travis-ci.org/antage/ut181a-cli.svg?branch=master)](https://travis-ci.org/antage/ut181a-cli) [![Build status](https://ci.appveyor.com/api/projects/status/rgkw2i08tfdh4x1a?svg=true)](https://ci.appveyor.com/project/antage/ut181a-cli)
+
 Uni-T UT181A digital multimeter (DMM) remote contorl command-line interface.
 It supports USB connection only.
 
