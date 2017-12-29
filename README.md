@@ -6,7 +6,7 @@ It supports USB connection only.
 ## Installing
 
 ```
-$ sudo apt-get install libusb-1.0-0-dev
+$ sudo apt-get install libudev-dev libhidapi-dev
 $ cargo install ut181a-cli
 ```
 
@@ -18,7 +18,7 @@ $ # Turn on DMM, press 'F4' ('SETUP') and set 'COMMUNICATION' to 'ON' state.
 $ # Set mVDC mode for example.
 $ ut181a-cli list-devices
 Found DMM at path '0001:0004:00'.
-$ ut181a-cli read-once
+$ ut181a-cli read once
 Mode: mVDC [] [AUTO]
 Range: -600...600 mV
 1.74 mVDC
