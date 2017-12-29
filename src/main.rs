@@ -2,6 +2,7 @@ extern crate ansi_term;
 extern crate clap;
 #[macro_use]
 extern crate error_chain;
+extern crate hid;
 extern crate ut181a;
 
 mod error;
@@ -9,25 +10,39 @@ use error::*;
 mod cli;
 mod display_measurement;
 
+use std::path::Path;
+
 use clap::ArgMatches;
 
-use ut181a::{Dmm, DmmEnumerator, Mode, Range};
+use ut181a::{Dmm, Mode, Range};
 use cli::clap_app;
 
 use display_measurement::{display_measurement, format_duration};
 
-fn open_dmm<'a>(enumerator: &'a DmmEnumerator, cli: &ArgMatches) -> Result<Dmm<'a>> {
+const VENDOR_ID: u16 = 0x10C4;
+const PRODUCT_ID: u16 = 0xEA80;
+
+fn open_dmm<'a>(manager: &hid::Manager, cli: &ArgMatches) -> Result<Dmm> {
+    let mut devices = manager.find(Some(VENDOR_ID), Some(PRODUCT_ID));
     if let Some(path) = cli.value_of("device") {
         if cli.is_present("verbose") {
             println!("Open device at path '{}'.", path);
         }
-        enumerator.open(path).map_err(Error::from)
+        let p = Path::new(path);
+        for device in devices {
+            if device.path() == p {
+                return Dmm::new(device.open()?).map_err(Error::from);
+            }
+        }
     } else {
         if cli.is_present("verbose") {
             println!("Open first found device.");
         }
-        enumerator.open_first().map_err(Error::from)
+        if let Some(device) = devices.next() {
+            return Dmm::new(device.open()?).map_err(Error::from);
+        }
     }
+    Err(ErrorKind::DmmIsNotFound.into())
 }
 
 fn set_mode(dmm: &mut Dmm, mode: Mode, verbose: bool) -> Result<()> {
@@ -40,15 +55,15 @@ fn set_mode(dmm: &mut Dmm, mode: Mode, verbose: bool) -> Result<()> {
 fn run() -> Result<()> {
     let cli = clap_app().get_matches();
 
-    let enumerator = DmmEnumerator::new()?;
+    let manager = hid::init()?;
 
     let verbose = cli.is_present("verbose");
     match cli.subcommand() {
-        ("list-devices", _) => for path in enumerator.enumerate() {
-            println!("Found DMM at path '{}'.", path);
+        ("list-devices", _) => for device in manager.find(Some(VENDOR_ID), Some(PRODUCT_ID)) {
+            println!("Found DMM at path '{}'.", device.path().to_string_lossy());
         },
         ("hold", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
             if verbose {
                 println!("Sending 'HOLD' command to DMM.");
@@ -56,138 +71,159 @@ fn run() -> Result<()> {
             dmm.toggle_hold()?;
         }
         (cmd @ "min-max-mode", Some(sub_matches)) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
             match sub_matches.subcommand() {
                 ("on", _) => {
                     if verbose {
                         println!("Sending 'MIN/MAX ON' command to DMM.");
                     }
-                    dmm.min_max_mode(true)?;
+                    dmm.set_min_max_mode(true)?;
                 }
                 ("off", _) => {
                     if verbose {
                         println!("Sending 'MIN/MAX OFF' command to DMM.");
                     }
-                    dmm.min_max_mode(false)?;
+                    dmm.set_min_max_mode(false)?;
                 }
                 (subcmd, _) => {
-                    return Err(Error::from(
-                        ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)),
-                    ));
+                    return Err(ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)).into());
                 }
             }
         }
-        ("save", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+        (cmd @ "save", Some(sub_matches)) => {
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'SAVE' command to DMM.");
-            }
-            dmm.save()?;
-        }
-        ("save-count", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
-            dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'GET SAVE COUNT' command to DMM.");
-            }
-            let count = dmm.save_count()?;
-
-            println!("Save count: {}", count);
-        }
-        ("read-save", Some(submatches)) => {
-            let n = submatches
-                .value_of("INDEX")
-                .ok_or("Undefined index")?
-                .parse::<u16>()?;
-            let mut dmm = open_dmm(&enumerator, &cli)?;
-            dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'READ SAVE AT {}' command to DMM.", n);
-            }
-            let save = dmm.read_save(n)?;
-            println!("{}", save.0.format("%Y-%m-%d %H:%M:%S"));
-            display_measurement(&save.1)?;
-        }
-        ("delete-all-save", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
-            dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'DELETE ALL SAVE' command to DMM.");
-            }
-            dmm.delete_all_save()?;
-        }
-        ("delete-save", Some(submatches)) => {
-            let index = submatches
-                .value_of("INDEX")
-                .ok_or("Undefined entry index")?
-                .parse::<u16>()?;
-            let mut dmm = open_dmm(&enumerator, &cli)?;
-            dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'DELETE SAVE #{}' command to DMM.", index);
-            }
-            dmm.delete_save(index)?;
-        }
-        ("record-count", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
-            dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'GET RECORD COUNT' command to DMM.");
-            }
-            let count = dmm.record_count()?;
-
-            println!("Record count: {}", count);
-        }
-        ("record-list", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
-            dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'GET RECORD COUNT' command to DMM.");
-            }
-            let count = dmm.record_count()?;
-
-            for i in 1..(count + 1) {
-                if verbose {
-                    println!("Sending 'GET RECORD INFO #{}' command to DMM.", i);
+            match sub_matches.subcommand() {
+                ("store", _) => {
+                    if verbose {
+                        println!("Sending 'SAVE' command to DMM.");
+                    }
+                    dmm.save_measurement()?;
                 }
-                let info = dmm.record_info(i)?;
-                println!("RECORD #{}:", i);
-                println!("\tName: {}", info.name);
-                println!("\tUnit: {}", info.unit);
-                println!("\tInterval: {}", format_duration(info.interval));
-                println!("\tDuration: {}", format_duration(info.duration));
-                println!("\tSample count: {}", info.sample_count);
-                println!("\tMaximum value: {}", info.max);
-                println!("\tAverage value: {}", info.average);
-                println!("\tMinimum value: {}", info.min);
-            }
+                ("count", _) => {
+                    if verbose {
+                        println!("Sending 'GET SAVE COUNT' command to DMM.");
+                    }
+                    let count = dmm.get_saved_measurement_count()?;
 
-            println!("\nTotal record count: {}", count);
+                    println!("Save count: {}", count);
+                }
+                ("read", Some(read_matches)) => {
+                    let n = read_matches
+                        .value_of("INDEX")
+                        .ok_or("Undefined index")?
+                        .parse::<u16>()?;
+                    if verbose {
+                        println!("Sending 'READ SAVE AT {}' command to DMM.", n);
+                    }
+                    let save = dmm.get_saved_measurement(n)?;
+                    println!("{}", save.0.format("%Y-%m-%d %H:%M:%S"));
+                    display_measurement(&save.1)?;
+                }
+                ("delete-all", _) => {
+                    if verbose {
+                        println!("Sending 'DELETE ALL SAVE' command to DMM.");
+                    }
+                    dmm.delete_all_saved_measurement()?;
+                }
+                ("delete", Some(delete_matches)) => {
+                    let index = delete_matches
+                        .value_of("INDEX")
+                        .ok_or("Undefined entry index")?
+                        .parse::<u16>()?;
+                    if verbose {
+                        println!("Sending 'DELETE SAVE #{}' command to DMM.", index);
+                    }
+                    dmm.delete_saved_measurement(index)?;
+                }
+                (subcmd, _) => {
+                    return Err(ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)).into());
+                }
+            }
         }
-        ("record", Some(submatches)) => {
-            let n = submatches
-                .value_of("INDEX")
-                .ok_or("Undefined index")?
-                .parse::<u16>()?;
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+        (cmd @ "record", Some(sub_matches)) => {
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
-            if verbose {
-                println!("Sending 'GET RECORD DATA #{}' command to DMM.", n);
+            match sub_matches.subcommand() {
+                ("count", _) => {
+                    if verbose {
+                        println!("Sending 'GET RECORD COUNT' command to DMM.");
+                    }
+                    let count = dmm.get_record_count()?;
+
+                    println!("Record count: {}", count);
+                }
+                ("list", _) => {
+                    if verbose {
+                        println!("Sending 'GET RECORD COUNT' command to DMM.");
+                    }
+                    let count = dmm.get_record_count()?;
+
+                    for i in 1..(count + 1) {
+                        if verbose {
+                            println!("Sending 'GET RECORD INFO #{}' command to DMM.", i);
+                        }
+                        let info = dmm.get_record_info(i)?;
+                        println!("RECORD #{}:", i);
+                        println!("\tName: {}", info.name);
+                        println!("\tUnit: {}", info.unit);
+                        println!("\tInterval: {}", format_duration(info.interval));
+                        println!("\tDuration: {}", format_duration(info.duration));
+                        println!("\tSample count: {}", info.sample_count);
+                        println!("\tMaximum value: {}", info.max);
+                        println!("\tAverage value: {}", info.average);
+                        println!("\tMinimum value: {}", info.min);
+                    }
+
+                    println!("\nTotal record count: {}", count);
+                }
+                ("read", Some(read_matches)) => {
+                    let n = read_matches
+                        .value_of("INDEX")
+                        .ok_or("Undefined index")?
+                        .parse::<u16>()?;
+                    if verbose {
+                        println!("Sending 'GET RECORD DATA #{}' command to DMM.", n);
+                    }
+                    let items = dmm.get_record_data(n)?;
+                    for (i, item) in items.iter().enumerate() {
+                        println!("#{:06} {} {}", i + 1, item.timestamp, item.value);
+                    }
+                    println!("Total sample count: {}", items.len());
+                }
+                ("start", Some(start_matches)) => {
+                    let name = start_matches.value_of("NAME").ok_or("Undefined name")?;
+                    let interval = start_matches
+                        .value_of("INTERVAL")
+                        .ok_or("Undefined interval")?
+                        .parse::<u16>()?;
+                    let duration = start_matches
+                        .value_of("DURATION")
+                        .ok_or("Undefined duration")?
+                        .parse::<u32>()?;
+                    if verbose {
+                        println!("Sending 'RECORD START' command to DMM.");
+                    }
+                    dmm.start_record(name, interval, duration)?;
+                }
+                ("stop", _) => {
+                    if verbose {
+                        println!("Sending 'RECORD STOP' command to DMM.");
+                    }
+                    dmm.stop_record()?;
+                }
+                (subcmd, _) => {
+                    return Err(ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)).into());
+                }
             }
-            let items = dmm.record_data(n)?;
-            for (i, item) in items.iter().enumerate() {
-                println!("#{:06} {} {}", i + 1, item.timestamp, item.value);
-            }
-            println!("Total sample count: {}", items.len());
         }
         ("ref", Some(submatches)) => {
             let val = submatches
                 .value_of("VALUE")
                 .ok_or("Undefined reference value")?
                 .parse::<f32>()?;
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
             if verbose {
                 println!("Sending 'SET REFERENCE VALUE {}' command to DMM.", val);
@@ -195,7 +231,7 @@ fn run() -> Result<()> {
             dmm.set_reference_value(val)?;
         }
         (cmd @ "range", Some(sub_matches)) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
             match sub_matches.subcommand() {
                 ("auto", _) => {
@@ -253,14 +289,15 @@ fn run() -> Result<()> {
                     dmm.set_range(Range::Step8)?;
                 }
                 (subcmd, _) => {
-                    return Err(Error::from(
-                        ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)),
-                    ));
+                    return Err(Error::from(ErrorKind::UnknownCliCommand(format!(
+                        "{} {}",
+                        cmd, subcmd
+                    ))));
                 }
             }
         }
         (cmd @ "mode", Some(submatches)) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
             dmm.monitor_off()?;
             match submatches.subcommand() {
                 ("vac", _) => set_mode(&mut dmm, Mode::VAC_Normal, verbose)?,
@@ -363,14 +400,15 @@ fn run() -> Result<()> {
                 ("aac-peak", _) => set_mode(&mut dmm, Mode::AAC_Peak, verbose)?,
 
                 (subcmd, _) => {
-                    return Err(Error::from(
-                        ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)),
-                    ));
+                    return Err(Error::from(ErrorKind::UnknownCliCommand(format!(
+                        "{} {}",
+                        cmd, subcmd
+                    ))));
                 }
             }
         }
         ("read-once", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
 
             if verbose {
                 println!("Sending 'MONITOR ON' command to DMM.");
@@ -380,7 +418,7 @@ fn run() -> Result<()> {
                 println!("Reading a message from DMM.");
             }
 
-            let measurement = dmm.read_measurement()?;
+            let measurement = dmm.get_measurement()?;
             display_measurement(&measurement)?;
 
             if verbose {
@@ -389,7 +427,7 @@ fn run() -> Result<()> {
             dmm.monitor_off()?;
         }
         ("read-cont", _) => {
-            let mut dmm = open_dmm(&enumerator, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
 
             if verbose {
                 println!("Sending 'MONITOR ON' command to DMM.");
@@ -400,12 +438,12 @@ fn run() -> Result<()> {
                 if verbose {
                     println!("Reading a message from DMM.");
                 }
-                let measurement = dmm.read_measurement()?;
+                let measurement = dmm.get_measurement()?;
                 display_measurement(&measurement)?;
             }
         }
         (cmd, _) => {
-            return Err(Error::from(ErrorKind::UnknownCliCommand(cmd.to_owned())));
+            return Err(ErrorKind::UnknownCliCommand(cmd.to_owned()).into());
         }
     }
     Ok(())
