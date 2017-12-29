@@ -14,11 +14,13 @@ cache:
   - target
 build_script:
   - cargo build --verbose --release --features=build --target x86_64-pc-windows-msvc
+  - copy target/i686-pc-windows-msvc/release/ut181a-cli.exe target/ut181a-cli_32bit.exe
   - cargo build --verbose --release --features=build --target i686-pc-windows-msvc
+  - copy target/x86_64-pc-windows-msvc/release/ut181a-cli.exe target/ut181a-cli_64bit.exe
 test: off
 deploy: off
 artifacts:
-  - path: target/i686-pc-windows-msvc/release/ut181a-cli.exe
+  - path: target/ut181a-cli_32bit.exe
     name: MSVC32
-  - path: target/x86_64-pc-windows-msvc/release/ut181a-cli.exe
+  - path: target/ut181a-cli_64bit.exe
     name: MSVC64
