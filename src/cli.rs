@@ -220,6 +220,7 @@ pub(crate) fn clap_app<'a, 'b>() -> App<'a, 'b> {
         .subcommand(
             SubCommand::with_name("record")
                 .about("Record management commands")
+                .setting(clap::AppSettings::SubcommandRequiredElseHelp)
                 .subcommands(record_subcommands()),
         )
 }
