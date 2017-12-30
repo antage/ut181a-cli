@@ -402,7 +402,7 @@ fn run() -> Result<()> {
             }
         }
         (cmd @ "read", Some(read_matches)) => {
-            let mut dmm = open_dmm(&manage, &cli)?;
+            let mut dmm = open_dmm(&manager, &cli)?;
 
             match read_matches.subcommand() {
                 ("once", _) => {
