@@ -289,10 +289,7 @@ fn run() -> Result<()> {
                     dmm.set_range(Range::Step8)?;
                 }
                 (subcmd, _) => {
-                    return Err(Error::from(ErrorKind::UnknownCliCommand(format!(
-                        "{} {}",
-                        cmd, subcmd
-                    ))));
+                    return Err(ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)).into());
                 }
             }
         }
@@ -400,10 +397,7 @@ fn run() -> Result<()> {
                 ("aac-peak", _) => set_mode(&mut dmm, Mode::AAC_Peak, verbose)?,
 
                 (subcmd, _) => {
-                    return Err(Error::from(ErrorKind::UnknownCliCommand(format!(
-                        "{} {}",
-                        cmd, subcmd
-                    ))));
+                    return Err(ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)).into());
                 }
             }
         }
