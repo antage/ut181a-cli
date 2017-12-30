@@ -15,8 +15,10 @@ build_script:
   - cargo build --verbose --release --features=build --target x86_64-pc-windows-msvc
   - cargo build --verbose --release --features=build --target i686-pc-windows-msvc
 after_build:
-  - 7z a target/ut181a-cli-windows-x32.zip target/i686-pc-windows-msvc/release/ut181a-cli.exe
-  - 7z a target/ut181a-cli-windows-x64.zip target/x86_64-pc-windows-msvc/release/ut181a-cli.exe
+  - cd %APPVEYOR_BUILD_FOLDER%/target/i686-pc-windows-msvc/release
+  - 7z a %APPVEYOR_BUILD_FOLDER%/target/ut181a-cli-windows-x32.zip ut181a-cli.exe
+  - cd %APPVEYOR_BUILD_FOLDER%/target/x86_64-pc-windows-msvc/release
+  - 7z a %APPVEYOR_BUILD_FOLDER%/target/ut181a-cli-windows-x64.zip ut181a-cli.exe
 test: off
 artifacts:
   - path: target/ut181a-cli-windows-x32.zip
