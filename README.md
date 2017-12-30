@@ -7,6 +7,10 @@ It supports USB connection only.
 
 ## Installing
 
+You need Rust programming language toolchain to compile `ut181a-cli`.
+Recommended way to install Rust is `rustup` tool.
+Follow instructions at https://www.rustup.rs/.
+
 ### Linux
 
 ```
@@ -16,8 +20,9 @@ $ cargo install ut181a-cli
 
 ### Windows
 
+You can download compiled binaries at [releases](https://github.com/antage/ut181a-cli/releases) page.
 
-Requirements:
+Requirements for compiling from the source code:
 
 * Rust target `*-pc-windows-msvc`: VisualStudio 2015.
 * Rust target `*-pc-windows-gnu`: MinGW
