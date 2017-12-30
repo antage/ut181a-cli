@@ -401,39 +401,44 @@ fn run() -> Result<()> {
                 }
             }
         }
-        ("read-once", _) => {
-            let mut dmm = open_dmm(&manager, &cli)?;
+        (cmd @ "read", Some(read_matches)) => {
+            let mut dmm = open_dmm(&manage, &cli)?;
 
-            if verbose {
-                println!("Sending 'MONITOR ON' command to DMM.");
-            }
-            dmm.monitor_on()?;
-            if verbose {
-                println!("Reading a message from DMM.");
-            }
+            match read_matches.subcommand() {
+                ("once", _) => {
+                    if verbose {
+                        println!("Sending 'MONITOR ON' command to DMM.");
+                    }
+                    dmm.monitor_on()?;
+                    if verbose {
+                        println!("Reading a message from DMM.");
+                    }
 
-            let measurement = dmm.get_measurement()?;
-            display_measurement(&measurement)?;
+                    let measurement = dmm.get_measurement()?;
+                    display_measurement(&measurement)?;
 
-            if verbose {
-                println!("Sending 'MONITOR OFF' command to DMM.");
-            }
-            dmm.monitor_off()?;
-        }
-        ("read-cont", _) => {
-            let mut dmm = open_dmm(&manager, &cli)?;
-
-            if verbose {
-                println!("Sending 'MONITOR ON' command to DMM.");
-            }
-            dmm.monitor_on()?;
-
-            loop {
-                if verbose {
-                    println!("Reading a message from DMM.");
+                    if verbose {
+                        println!("Sending 'MONITOR OFF' command to DMM.");
+                    }
+                    dmm.monitor_off()?;
                 }
-                let measurement = dmm.get_measurement()?;
-                display_measurement(&measurement)?;
+                ("cont", _) => {
+                    if verbose {
+                        println!("Sending 'MONITOR ON' command to DMM.");
+                    }
+                    dmm.monitor_on()?;
+
+                    loop {
+                        if verbose {
+                            println!("Reading a message from DMM.");
+                        }
+                        let measurement = dmm.get_measurement()?;
+                        display_measurement(&measurement)?;
+                    }
+                }
+                (subcmd, _) => {
+                    return Err(ErrorKind::UnknownCliCommand(format!("{} {}", cmd, subcmd)).into());
+                }
             }
         }
         (cmd, _) => {
